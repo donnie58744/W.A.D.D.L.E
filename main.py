@@ -392,8 +392,8 @@ class TrayIcon(QObject):
     def executeThread(self):
         # In order for the icon to be displayed, you must provide an icon
         self.icon = pystray.Icon(
-            name='AutoVR',
-            icon=self.create_image(),title='AutoVR')
+            name='WADDLE',
+            icon=self.create_image(),title='WADDLE')
         self.icon.menu=pystray.Menu(
             pystray.MenuItem("Process Manager", lambda: self.signal_to_emit.emit('ProcessManager')),
             pystray.MenuItem("Settings", lambda: self.signal_to_emit.emit('SettingsMenu')),
