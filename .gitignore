@@ -1,2 +1,4 @@
 
 *.spec
+files/config.json
+files/watchlist.txt
