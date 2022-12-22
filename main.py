@@ -1,41 +1,44 @@
+import os,pystray,sys
 from pymem import Pymem
-import os
-import pystray
-import sys
 from PIL import Image
 from PyQt6 import uic, QtTest
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QObject
-from PyQt6.QtGui import QPixmap
 from functools import partial
 from libs.Config import *
 from libs.SystemChanger import *
 from libs.UiFunctions import *
+from libs.RazerCortex import *
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
 
 class vars():
-    dir_path = os.path.dirname(os.path.realpath(__file__))
+    # Settings Memory
     defaultWidth = 0
     defaultHeight = 0
-
     optimizedWidth = 0
     optimizedHeight = 0
-    programWatchlist = []
-    priortyWatchList=['OVRServer_x64.exe']
-    currentTrackedProgram = ''
-    overide=False
-    exeRunning=False
     defaultPowerPlan=None
-    running=True
-    stopLoadingScreen=False
+    cortexPath=None
 
     # Oculus Settings Memory
     oculusBoost=None
 
+    # AutoVR Memory
+    currentTrackedProgram = ''
+    exeRunning=False
+
     # Process Window Memory
+    programWatchlist = []
     watchlistBtnAmt=0
     buttonMem=0
 
-dir_path = os.path.dirname(os.path.realpath(__file__))
+    # Other Memory
+    priortyWatchList=['OVRServer_x64.exe']
+    overide=False
+    running=True
+    windowVis=None
+    stopLoadingScreen=False
 
 class Ui(QMainWindow):
     mainThreadSig = pyqtSignal(str)
@@ -45,32 +48,12 @@ class Ui(QMainWindow):
     def shutdown(self):
         app.quit()
 
-    def loadingScreen(self, first=None):
-        #Loading Screen
-        if (first):
-            loadingWidth=500
-            loadingHeight=500
-            self.setWindowFlags(Qt.WindowType.FramelessWindowHint)
-            self.setFixedWidth(loadingWidth)
-            self.setFixedHeight(loadingHeight)
-            pic = createImage(ui=self, image="/res/loadingScreen.png", width=loadingWidth+1, height=loadingHeight+1)
-            pic.show()
-            self.show()
-        #-------------#
-        # End Loading
-        QtTest.QTest.qWait(2500)
-        if (vars.stopLoadingScreen):
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.FramelessWindowHint)
-            self.hide()
-        else:
-            self.loadingScreen()
-
     def __init__(self):
         super().__init__()
         app.setQuitOnLastWindowClosed(False)
         self.setFixedSize(self.size())
         # Center
-        self.centerWindow()
+        CenterWindow(self,app)
         # Setup Threads
         self.trayIconThread = TrayIcon(self.mainThreadSig)
         self.trayIconFoo = QThread(self) 
@@ -96,34 +79,43 @@ class Ui(QMainWindow):
         self.watchlistFoo.start()
         self.priorityWatchlistFoo.start()
 
-        self.loadingScreen(first=True)
-
+        loadingScreen(ui=self, first=True)
+    
     @pyqtSlot(str)
     def threadReciver(self, sent):
         match sent:
             case 'ProcessManager':
-                self.refreshProcessManager(varibles=True)
-                self.show()
-                self.activateWindow()
-                self.centerWindow()
+                if (vars.stopLoadingScreen):
+                    self.refreshProcessManager(varibles=True)
+                    self.show()
+                    self.activateWindow()
+                    CenterWindow(self, app)
             case 'SettingsMenu':
-                self.refreshSettingsMenu(menu='base')
-                self.show()
-                self.activateWindow()
-                self.centerWindow()
+                if (vars.stopLoadingScreen):
+                    self.refreshSettingsMenu(menu='base')
+                    self.show()
+                    self.activateWindow()
+                    CenterWindow(self, app)
             case 'centerWindow':
-                self.centerWindow()
-            case 'quit':
+                CenterWindow(self, app)
+            case 'stopLoadingScreen':
                 vars.stopLoadingScreen=True
+                loadingScreen(ui=self, loadingScreenStop=True)
+            case 'ResFix':
+                vars.windowVis=self.isVisible()
+                self.show()
+                CenterWindow(self, app)
+            case 'ResFix2':
+                CenterWindow(self, app)
+                if (not vars.windowVis):
+                    vars.windowVis=None
+                    self.hide()
+            case 'quit':
+                loadingScreen(ui=self, loadingScreenStop=True)
                 vars.running=False
+                changeResolution(width=vars.defaultWidth, height=vars.defaultHeight)
                 changePowerPlan(plan='Default', id=vars.defaultPowerPlan)
                 self.shutdown()
-
-    def centerWindow(self):
-        qr = self.frameGeometry()
-        cp = self.screen().availableGeometry().center()
-        qr.moveCenter(cp)
-        self.move(qr.topLeft())
 
     def toggledBtn(self, button, request):
         match request:
@@ -279,6 +271,9 @@ class Ui(QMainWindow):
 
     def applySettings(self, menu):
         match menu:
+            case 'base':
+                writeConfig(file='/files/config.json', key='cortexPath', value=self.cortexPathLabel.text())
+                configMem(request='cortexPath')
             case 'display':
                 writeConfig(file='/files/config.json', key='optimizedWidth', value=self.optimizedWidthTxtBox.text())
                 writeConfig(file='/files/config.json', key='optimizedHeight', value=self.optimizedHeightTxtBox.text())
@@ -295,6 +290,16 @@ class Ui(QMainWindow):
         match menu:
             case 'base':
                 uic.loadUi(dir_path+'/ui/settingsMenu.ui', self)
+                self.cortexPathLabel.setText(vars.cortexPath)
+                def fileDialogBtnClick():
+                    try:
+                        path=CortexFileDialog(ui=self)[0]
+                    except Exception:
+                        path=vars.cortexPath
+                        pass
+                    self.cortexPathLabel.setText(path)
+                self.applyBtn.clicked.connect(lambda: self.applySettings(menu='base'))
+                self.cortexFileDialogBtn.clicked.connect(fileDialogBtnClick)
             case 'display':
                 configMem(request='optimized')
 
@@ -318,7 +323,7 @@ class Ui(QMainWindow):
             case 'powerPlan':
                 uic.loadUi(dir_path+'/ui/settings/powerPlanSettings.ui', self)
 
-                self.resetBtn.clicked.connect(lambda: (configMem(request='defaultPowerPlan'),self.defaultPowerPlanTxtBox.setText(vars.defaultPowerPlan), checkmarkIcon(ui=self)))
+                self.resetBtn.clicked.connect(lambda: (configMem(request='defaultPowerPlan', overide=True),self.defaultPowerPlanTxtBox.setText(vars.defaultPowerPlan), checkmarkIcon(ui=self)))
                 self.plansBtn.clicked.connect(openPowerPlans)
                 self.defaultPowerPlanTxtBox.setText(vars.defaultPowerPlan)
                 self.defaultPowerPlanTxtBox.setStyleSheet('background-color: rgb(86, 86, 86);\ncolor: rgb(255, 255, 255);')
@@ -329,6 +334,7 @@ class Ui(QMainWindow):
                 self.applyBtn.clicked.connect(lambda: self.applySettings(menu='oculus'))
                 self.cancelBtn.clicked.connect(lambda: self.refreshSettingsMenu(menu='oculus'))
 
+        self.settingsBtn.clicked.connect(lambda: self.refreshSettingsMenu(menu='base'))
         self.displayBtn.clicked.connect(lambda: self.refreshSettingsMenu(menu='display'))
         self.powerPlanBtn.clicked.connect(lambda: self.refreshSettingsMenu(menu='powerPlan'))
         self.oculusBtn.clicked.connect(lambda: self.refreshSettingsMenu(menu='oculus'))
@@ -336,12 +342,6 @@ class Ui(QMainWindow):
     #--------------#
 
 # Public Functions
-def getWatchList(file):
-    with open(vars.dir_path + file) as f:
-        data = f.read()
-
-    return data.split('\n')
-
 def setupWatchList():
     print("Chekcing Watch List...")
     vars.programWatchlist=[]
@@ -349,8 +349,11 @@ def setupWatchList():
     for i in getWatchList('/files/watchlist.txt'):
         if (i != ''):
             vars.programWatchlist.append(i)
+            print(i)
+    print('Watchlist Checked')
 
-def configMem(request=None, all=None):
+def configMem(request=None, all=None, overide=None):
+    print('Loading Memory...')
     if(request=='defaultResoultion' or all):
         defaultResolutionData=getCurrentResolution()
         vars.defaultWidth = int(defaultResolutionData[0])
@@ -362,8 +365,17 @@ def configMem(request=None, all=None):
     if (request=='oculusBoost'or all):
         vars.oculusBoost = bool(getConfig(file='/files/config.json')['oculusBoost'])
     if (request=='defaultPowerPlan' or all):
-        vars.defaultPowerPlan=getCurrentPowerPlan()
-        writeConfig(file='/files/config.json', key='defaultPowerPlan', value=vars.defaultPowerPlan)
+        configData = getConfig(file='/files/config.json')['defaultPowerPlan']
+        if (not configData or overide):
+            writeConfig(file='/files/config.json', key='defaultPowerPlan', value=getCurrentPowerPlan())
+            #Refrsh Config Data
+            configData = getConfig(file='/files/config.json')['defaultPowerPlan']
+        vars.defaultPowerPlan=configData
+    if (request=='cortexPath' or all):
+        configData=getConfig(file='/files/config.json')["cortexPath"]
+        vars.cortexPath=configData
+    
+    print('Memory Loaded!')
 
 class PriortyChanger(QObject):
     def __init__(self, signal_to_emit):
@@ -385,7 +397,7 @@ class TrayIcon(QObject):
 
     def create_image(self):
         # Generate an image and draw a pattern
-        image = Image.open(vars.dir_path+'/res/duckWithVRHeadset.png')
+        image = Image.open(dir_path+'/res/duckWithVRHeadset.png')
         return image
 
     @pyqtSlot()
@@ -431,18 +443,29 @@ class AutoVR(QObject):
             if (not vars.exeRunning):
                 vars.currentTrackedProgram = program_name
                 vars.exeRunning = True
+                self.signal_to_emit.emit('ResFix')
+                QtTest.QTest.qWait(1000)
                 changeResolution(vars.optimizedWidth,vars.optimizedHeight)
+                self.signal_to_emit.emit('ResFix2')
                 self.signal_to_emit.emit('centerWindow')
+                # Wait for Cortex BS if using cortex
+                if (CortexBoost(cortexExePath=vars.cortexPath)):
+                    QtTest.QTest.qWait(20000)
                 changePowerPlan('High')
-                #sendWin10Notification('Auto VR Setup', 'Resolution Optimized!')
         except:
             if (vars.exeRunning and vars.currentTrackedProgram == program_name or vars.overide):
+                self.signal_to_emit.emit('ResFix')
+                QtTest.QTest.qWait(1000)
                 changeResolution(vars.defaultWidth,vars.defaultHeight)
+                self.signal_to_emit.emit('ResFix2')
                 self.signal_to_emit.emit('centerWindow')
-                changePowerPlan('Default', id=vars.defaultPowerPlan)
                 vars.currentTrackedProgram = ''
                 vars.exeRunning = False
                 vars.overide=False
+                # Wait for Cortex BS if using cortex
+                if (CortexRestore(cortexExePath=vars.cortexPath)):
+                    QtTest.QTest.qWait(20000)
+                changePowerPlan('Default', id=vars.defaultPowerPlan)
     
     def finishCheck(self):
         if (len(vars.programWatchlist)==0):
@@ -452,17 +475,20 @@ class AutoVR(QObject):
 
     @pyqtSlot()
     def executeThread(self):
+        # Setup Config Files
+        setupConfigFiles(path='/files/')
+        # Load Everything First
         setupWatchList()
         configMem(all=True)
-
+        self.finishCheck()
+        # Stop Loading Screen
+        self.signal_to_emit.emit('stopLoadingScreen')
         while vars.running:
             print('RUNNING...')
-            
+            # Keep this function runnin
             self.finishCheck()
 
             QtTest.QTest.qWait(5000)
-
-            vars.stopLoadingScreen=True
 
 app = QApplication(sys.argv)
 w = Ui()
