@@ -497,33 +497,34 @@ class AutoVR(QObject):
         # Check if the program is running
         try:
             runningProcesses=[]
-            for p in psutil.process_iter():
-                runningProcesses.append(p.name())
-            if (program_name in runningProcesses and not vars.exeRunning):
-                vars.currentTrackedProgram = program_name
-                vars.exeRunning = True
-                self.signal_to_emit.emit('ResFix')
-                QtTest.QTest.qWait(1000)
-                changeResolution(vars.optimizedWidth,vars.optimizedHeight)
-                self.signal_to_emit.emit('ResFix2')
-                self.signal_to_emit.emit('centerWindow')
-                # Wait for Cortex BS if using cortex
-                if (CortexBoost(cortexExePath=vars.cortexPath)):
-                    QtTest.QTest.qWait(20000)
-                changePowerPlan('High')
-            elif (program_name not in runningProcesses and vars.currentTrackedProgram == program_name or vars.overide):
-                self.signal_to_emit.emit('ResFix')
-                QtTest.QTest.qWait(1000)
-                changeResolution(vars.defaultWidth,vars.defaultHeight)
-                self.signal_to_emit.emit('ResFix2')
-                self.signal_to_emit.emit('centerWindow')
-                vars.currentTrackedProgram = ''
-                vars.exeRunning = False
-                vars.overide=False
-                # Wait for Cortex BS if using cortex
-                if (CortexRestore(cortexExePath=vars.cortexPath)):
-                    QtTest.QTest.qWait(20000)
-                changePowerPlan('Default', id=vars.defaultPowerPlan)
+            if (program_name != ''):
+                for p in psutil.process_iter():
+                    runningProcesses.append(p.name())
+                if (program_name in runningProcesses and not vars.exeRunning):
+                    vars.currentTrackedProgram = program_name
+                    vars.exeRunning = True
+                    self.signal_to_emit.emit('ResFix')
+                    QtTest.QTest.qWait(1000)
+                    changeResolution(vars.optimizedWidth,vars.optimizedHeight)
+                    self.signal_to_emit.emit('ResFix2')
+                    self.signal_to_emit.emit('centerWindow')
+                    # Wait for Cortex BS if using cortex
+                    if (CortexBoost(cortexExePath=vars.cortexPath)):
+                        QtTest.QTest.qWait(20000)
+                    changePowerPlan('High')
+                elif (program_name not in runningProcesses and vars.currentTrackedProgram == program_name or vars.overide):
+                    self.signal_to_emit.emit('ResFix')
+                    QtTest.QTest.qWait(1000)
+                    changeResolution(vars.defaultWidth,vars.defaultHeight)
+                    self.signal_to_emit.emit('ResFix2')
+                    self.signal_to_emit.emit('centerWindow')
+                    vars.currentTrackedProgram = ''
+                    vars.exeRunning = False
+                    vars.overide=False
+                    # Wait for Cortex BS if using cortex
+                    if (CortexRestore(cortexExePath=vars.cortexPath)):
+                        QtTest.QTest.qWait(20000)
+                    changePowerPlan('Default', id=vars.defaultPowerPlan)
         except Exception as e:
             print(e)
     
