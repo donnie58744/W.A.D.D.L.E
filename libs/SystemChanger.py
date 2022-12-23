@@ -42,26 +42,29 @@ def getRunningProcesses():
     '''
     Get list of running process sorted by Memory Usage
     '''
-    nameList=[]
-    listOfProcObjectsTemp = []
-    listOfProcObjects = []
-    # Iterate over the list
-    for proc in psutil.process_iter():
-        try:
-            # Fetch process details as dict
-            pinfo = proc.as_dict(attrs=['pid', 'name', 'username'])
-            pinfo['vms'] = proc.memory_info().vms / (1024 * 1024)
-            # Append dict to list
-            listOfProcObjectsTemp.append(pinfo)
-        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
-            pass
-    # Sort list of dict by key vms i.e. memory usage
-    listOfProcObjectsTemp = sorted(listOfProcObjectsTemp, key=lambda procObj: procObj['vms'], reverse=True)
+    try:
+        nameList=[]
+        listOfProcObjectsTemp = []
+        listOfProcObjects = []
+        # Iterate over the list
+        for proc in psutil.process_iter():
+            try:
+                # Fetch process details as dict
+                pinfo = proc.as_dict(attrs=['pid', 'name', 'username'])
+                pinfo['vms'] = proc.memory_info().vms / (1024 * 1024)
+                # Append dict to list
+                listOfProcObjectsTemp.append(pinfo)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+                pass
+        # Sort list of dict by key vms i.e. memory usage
+        listOfProcObjectsTemp = sorted(listOfProcObjectsTemp, key=lambda procObj: procObj['vms'], reverse=True)
 
-    for x in listOfProcObjectsTemp:
-        if (x["name"] not in nameList):
-            nameList.append(x["name"])
-            listOfProcObjects.append([x["name"],x["pid"]])
+        for x in listOfProcObjectsTemp:
+            if (x["name"] not in nameList):
+                nameList.append(x["name"])
+                listOfProcObjects.append([x["name"],x["pid"], psutil.Process(x['pid']).exe()])
+    except Exception as e:
+        pass
     return listOfProcObjects
 
 def changePriority(pid, priority):

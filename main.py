@@ -9,6 +9,7 @@ from libs.Config import *
 from libs.SystemChanger import *
 from libs.UiFunctions import *
 from libs.RazerCortex import *
+from libs.OpenVRMod import *
 
 dir_path = os.path.dirname(os.path.realpath(__file__))
 
@@ -121,9 +122,9 @@ class Ui(QMainWindow):
         match request:
             case 'add':
                 if (button.isChecked()):
-                    self.programsToAdd.append(button.text())
+                    self.programsToAdd.append([button.text(), button.objectName()])
                 else:
-                    self.programsToAdd.remove(button.text())
+                    self.programsToAdd.remove([button.text(), button.objectName()])
             case 'remove':
                 if (button.isChecked()):
                     self.programsToRemove.append(button.text())
@@ -139,7 +140,8 @@ class Ui(QMainWindow):
             if (self.programsToAdd):
                 with open(dir_path+'/files/watchlist.txt', 'a') as f:
                     for x in self.programsToAdd:
-                        f.write('\n'+str(x))
+                        programName=x[0]
+                        f.write('\n'+str(programName))
                 self.programsToAdd=[]
                 f.close()
                 self.addBtn.setText('DONE!')
@@ -158,14 +160,15 @@ class Ui(QMainWindow):
                 with open(dir_path+'/files/watchlist.txt', 'r') as f:
                     watchlist=f.read()
                     for x in str(watchlist).split('\n'):
-                        if (x not in self.programsToRemove):
-                            newWatchlist.append(x)
-                        else:
-                            try:
-                                vars.programWatchlist.remove(x)
-                                print(vars.programWatchlist)
-                            except Exception as e:
-                                continue
+                        if (x!=''):
+                            if (x not in self.programsToRemove):
+                                newWatchlist.append(x)
+                            else:
+                                try:
+                                    vars.programWatchlist.remove(x)
+                                except Exception as e:
+                                    continue
+
                     self.programsToRemove=[]
                 f.close()
 
@@ -175,15 +178,12 @@ class Ui(QMainWindow):
                 f.close()
 
                 # If Watchlist has one left then change resolution and stuff
-                print(len(vars.programWatchlist))
                 if (len(vars.programWatchlist)==0):
                     vars.overide=True
                 setupWatchList()
 
                 self.refreshProcessManager(varibles=True)
         except Exception as e:
-            print(e)
-            print(vars.programWatchlist)
             self.removeBtn.setText('ERROR!')
             self.removeBtn.setStyleSheet("background:red")
 
@@ -196,6 +196,7 @@ class Ui(QMainWindow):
         gridPosY = 0
         
         for x in getRunningProcesses():
+            path=x[2]
             name=x[0]
             if (amtBtn >= maxBtnRow):
                 amtBtn=0
@@ -203,10 +204,11 @@ class Ui(QMainWindow):
                 gridPosY+=50
             amtBtn+=1
             self.b1 = QPushButton(name, self.processesScrollArea)
+            self.b1.setObjectName(path)
             self.b1.setFixedHeight(buttonHeight)
             self.b1.setFixedWidth(buttonWidth)
             self.b1.setCursor(Qt.CursorShape.CrossCursor)
-            self.b1.setStyleSheet('background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: left;')
+            self.b1.setStyleSheet('background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: left; margin-right:20px')
             self.b1.setCheckable(True)
             self.b1.clicked.connect(partial(self.toggledBtn, self.b1, 'add'))
             self.b1.move(gridPosX,gridPosY)
@@ -289,17 +291,75 @@ class Ui(QMainWindow):
     def refreshSettingsMenu(self, menu):
         match menu:
             case 'base':
+                # Reset Vars
+                self.programsToAdd=[]
+                self.programsToRemove=[]
                 uic.loadUi(dir_path+'/ui/settingsMenu.ui', self)
+                # Create and Load UI elements
+                createScrollArea(request='button', frame=self.fsrFrame, width=505, height=130, list=getTxtConfig(file='/files/OpenVR.txt'), function=self.toggledBtn, functionRequest='remove', buttonWidth=300, buttonHeight=35, css='background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: right; margin-right:20px')
                 self.cortexPathLabel.setText(vars.cortexPath)
-                def fileDialogBtnClick():
+                # Button Functions
+                def cortexFileDialogBtnClick():
                     try:
-                        path=CortexFileDialog(ui=self)[0]
+                        path=FileDialog(ui=self, request='file', nameFilter="EXE File (*.exe)" ,defaultDir="C:\Program Files (x86)\Razer\Razer Cortex")[0]
                     except Exception:
                         path=vars.cortexPath
                         pass
                     self.cortexPathLabel.setText(path)
+                def injectFsrBtnClick():
+                    consoleMsg=''
+                    try:
+                        path=FileDialog(ui=self, request='folder', defaultDir="C:")[0]
+                        # Inject FSR
+                        if (findAndInstallOpenVR(path=path)):
+                            writeTxtConfig(file='/files/OpenVR.txt', value=path)
+                            consoleMsg=consoleMsg+'\n FSR Installed: ' + str(path)
+                            self.refreshSettingsMenu(menu='base')
+                        else:
+                            consoleMsg=consoleMsg+'\n FSR ERROR: ' + str(path)
+                    except Exception as e:
+                        consoleMsg=consoleMsg+'\n FSR ERROR: ' + str(e)
+                        pass
+                    console(self.consoleFrame, self.consoleLabel, consoleMsg)
+                def removeFsrBtnClick():
+                    try:
+                        consoleMsg=''
+                        newList=[]
+                        unistalled=False
+                        if (self.programsToRemove):
+                            for x in getTxtConfig(file='/files/OpenVR.txt'):
+                                if (x!=''):
+                                    if (x not in self.programsToRemove):
+                                        newList.append(x)
+                                    else:
+                                        try:
+                                            if(not findAndUninstallOpenVR(path=x)):
+                                                consoleMsg=consoleMsg+"\n FSR Cant Uninstall: "+str(x)
+                                            else:
+                                                unistalled=True
+                                        except Exception as e:
+                                            consoleMsg=consoleMsg+"\n FSR ERROR: "+str(x)
+                                            
+                            if (unistalled):
+                                newList='\n'.join(newList)
+                                # Remove FSR from config
+                                if(writeTxtConfig(file='/files/OpenVR.txt', value=newList, mode='w')):
+                                    consoleMsg=consoleMsg+"\n Uninstalled FSR: "+str(x)
+                                    self.refreshSettingsMenu(menu='base')
+                                else:
+                                    consoleMsg=consoleMsg+"\n Config ERROR: "+str(x)
+                            # Show whats going on in console
+                            console(self.consoleFrame, self.consoleLabel, consoleMsg)
+                    except Exception as e:
+                        consoleMsg=consoleMsg+"\n "+str(e)
+                        # Show whats going on in console
+                        console(self.consoleFrame, self.consoleLabel, consoleMsg)
+                        pass
+                # Setup Buttons
+                self.injectFsrBtn.clicked.connect(injectFsrBtnClick)
+                self.removeFsrBtn.clicked.connect(removeFsrBtnClick)
                 self.applyBtn.clicked.connect(lambda: self.applySettings(menu='base'))
-                self.cortexFileDialogBtn.clicked.connect(fileDialogBtnClick)
+                self.cortexFileDialogBtn.clicked.connect(cortexFileDialogBtnClick)
             case 'display':
                 configMem(request='optimized')
 
@@ -346,10 +406,9 @@ def setupWatchList():
     print("Chekcing Watch List...")
     vars.programWatchlist=[]
     #Convert Json Dict to Pythhon Array
-    for i in getWatchList('/files/watchlist.txt'):
+    for i in getTxtConfig('/files/watchlist.txt'):
         if (i != ''):
             vars.programWatchlist.append(i)
-            print(i)
     print('Watchlist Checked')
 
 def configMem(request=None, all=None, overide=None):
@@ -374,7 +433,6 @@ def configMem(request=None, all=None, overide=None):
     if (request=='cortexPath' or all):
         configData=getConfig(file='/files/config.json')["cortexPath"]
         vars.cortexPath=configData
-    
     print('Memory Loaded!')
 
 class PriortyChanger(QObject):
