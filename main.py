@@ -1,5 +1,4 @@
 import os,pystray,sys
-from pymem import Pymem
 from PIL import Image
 from PyQt6 import uic, QtTest
 from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton
@@ -497,8 +496,10 @@ class AutoVR(QObject):
     def checkForRunningProgram(self, program_name):
         # Check if the program is running
         try:
-            pm = Pymem(program_name)
-            if (not vars.exeRunning):
+            runningProcesses=[]
+            for p in psutil.process_iter():
+                runningProcesses.append(p.name())
+            if (program_name in runningProcesses and not vars.exeRunning):
                 vars.currentTrackedProgram = program_name
                 vars.exeRunning = True
                 self.signal_to_emit.emit('ResFix')
@@ -510,8 +511,7 @@ class AutoVR(QObject):
                 if (CortexBoost(cortexExePath=vars.cortexPath)):
                     QtTest.QTest.qWait(20000)
                 changePowerPlan('High')
-        except:
-            if (vars.exeRunning and vars.currentTrackedProgram == program_name or vars.overide):
+            elif (program_name not in runningProcesses and vars.currentTrackedProgram == program_name or vars.overide):
                 self.signal_to_emit.emit('ResFix')
                 QtTest.QTest.qWait(1000)
                 changeResolution(vars.defaultWidth,vars.defaultHeight)
@@ -524,6 +524,8 @@ class AutoVR(QObject):
                 if (CortexRestore(cortexExePath=vars.cortexPath)):
                     QtTest.QTest.qWait(20000)
                 changePowerPlan('Default', id=vars.defaultPowerPlan)
+        except Exception as e:
+            print(e)
     
     def finishCheck(self):
         if (len(vars.programWatchlist)==0):
