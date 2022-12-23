@@ -497,7 +497,7 @@ class AutoVR(QObject):
         # Check if the program is running
         try:
             runningProcesses=[]
-            if (program_name != ''):
+            if (program_name != '' or vars.overide):
                 for p in psutil.process_iter():
                     runningProcesses.append(p.name())
                 if (program_name in runningProcesses and not vars.exeRunning):
