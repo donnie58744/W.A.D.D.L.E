@@ -1,5 +1,5 @@
 import os
-from PyQt6.QtWidgets import QLabel, QFileDialog, QScrollArea, QWidget, QVBoxLayout, QPushButton
+from PyQt6.QtWidgets import QLabel, QFileDialog, QScrollArea, QWidget, QVBoxLayout, QGridLayout, QPushButton
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtCore import Qt
 from PyQt6 import QtTest
@@ -40,17 +40,18 @@ def createImage(ui, image, width, height):
     pic.move(int(ui.rect().center().x()-int(width/2)),int(ui.rect().center().y()-int(height/2)))
     return pic
 
-def createScrollArea(frame, request, list, width, height, function=None, functionRequest=None, buttonWidth=None, buttonHeight=None, css=None):
+def createScrollArea(frame, request, layout, list, width, height, verticalScrollBarPolicy, horizontalScrollBarPolicy, function=None, functionArgs=None, buttonWidth=None, buttonHeight=None, css=None):
+        countX=1
+        countY=1
         scroll = QScrollArea(frame)
         widget = QWidget()
-        vbox = QVBoxLayout()
 
         match request:
             case 'label':
                 for i in list:
                     if i != '':
                         object = QLabel(i)
-                        vbox.addWidget(object)
+                        layout.addWidget(object)
             case 'button':
                 for i in list:
                     if i != '':
@@ -60,14 +61,22 @@ def createScrollArea(frame, request, list, width, height, function=None, functio
                         b1.setCursor(Qt.CursorShape.CrossCursor)
                         b1.setStyleSheet(css)
                         b1.setCheckable(True)
-                        b1.clicked.connect(partial(function, b1, functionRequest))
-                        vbox.addWidget(b1)
+                        b1.clicked.connect(partial(function, b1, functionArgs))
+                        match layout:
+                            case QGridLayout():
+                                layout.addWidget(b1, countY, countX, 1, 1)
+                                if (countX >= 3):
+                                    countY+=1
+                                    countX=0
+                                countX+=1
+                            case other:
+                                layout.addWidget(b1)
 
-        widget.setLayout(vbox)
+        widget.setLayout(layout)
 
         #Scroll Area Properties
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
-        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(verticalScrollBarPolicy)
+        scroll.setHorizontalScrollBarPolicy(horizontalScrollBarPolicy)
         scroll.setFixedWidth(width)
         scroll.setFixedHeight(height)
         scroll.setWidgetResizable(True)

@@ -1,9 +1,8 @@
 import os,pystray,sys
 from PIL import Image
 from PyQt6 import uic, QtTest
-from PyQt6.QtWidgets import QApplication, QMainWindow, QPushButton
+from PyQt6.QtWidgets import QApplication, QMainWindow, QGridLayout, QVBoxLayout
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QObject
-from functools import partial
 from libs.Config import *
 from libs.SystemChanger import *
 from libs.UiFunctions import *
@@ -16,106 +15,115 @@ class vars():
     # Settings Memory
     defaultWidth = 0
     defaultHeight = 0
-    optimizedWidth = 0
-    optimizedHeight = 0
-    defaultPowerPlan=None
-    cortexPath=None
-
-    # Oculus Settings Memory
-    oculusBoost=None
 
     # AutoVR Memory
     currentTrackedProgram = ''
-    exeRunning=False
 
     # Process Window Memory
     programWatchlist = []
-    watchlistBtnAmt=0
-    buttonMem=0
 
     # Other Memory
-    priortyWatchList=['OVRServer_x64.exe']
-    overide=False
-    running=True
-    windowVis=None
+    runningThreads=True
     stopLoadingScreen=False
 
 class Ui(QMainWindow):
-    mainThreadSig = pyqtSignal(str)
     programsToAdd=[]
     programsToRemove=[]
-
-    def shutdown(self):
-        app.quit()
+    windowVis=None
 
     def __init__(self):
         super().__init__()
         app.setQuitOnLastWindowClosed(False)
         self.setFixedSize(self.size())
+        loadingScreen(ui=self, first=True)
         # Center
         CenterWindow(self,app)
+        # Setup Config Files
+        setupConfigFiles(path='/files/')
+        # Load Everything First
+        setupWatchList()
+        configData=getConfig(file='/files/config.json')
+        configMem(all=True)
+        # Restore Cortex
+        CortexRestore(configData["cortexPath"])
         # Setup Threads
-        self.trayIconThread = TrayIcon(self.mainThreadSig)
-        self.trayIconFoo = QThread(self) 
+        self.trayIconThread = TrayIcon()
+        self.watchlistThread=AutoVR()
+        self.priorityWatchlistThread=PriortyChanger()
+
+        self.trayIconFoo = QThread(self)
+        # Connect UI Functions to Tray
+        self.trayIconThread.processManagerSig.connect(self.openProcessManager)
+        self.trayIconThread.settingsMenuSig.connect(self.openSettingsMenu)
+        self.trayIconThread.quitSig.connect(self.shutdown)
         self.trayIconThread.moveToThread(self.trayIconFoo)
 
-        self.watchlistThread=AutoVR(self.mainThreadSig)
         self.watchlistFoo=QThread(self)
+        # Connect UI Functions to AutoVR
+        self.watchlistThread.resFixPhase1Sig.connect(self.ResFixPhase1)
+        self.watchlistThread.resFixPhase2Sig.connect(self.ResFixPhase2)
+        self.watchlistThread.stopLoadingScreenSig.connect(self.stopLoadingScreen)
         self.watchlistThread.moveToThread(self.watchlistFoo)
 
-        self.priorityWatchlistThread=PriortyChanger(self.mainThreadSig)
         self.priorityWatchlistFoo=QThread(self)
         self.priorityWatchlistThread.moveToThread(self.priorityWatchlistFoo)
 
         self.trayIconFoo.started.connect(self.trayIconThread.executeThread)
         self.watchlistFoo.started.connect(self.watchlistThread.executeThread)
         self.priorityWatchlistFoo.started.connect(self.priorityWatchlistThread.executeThread)
-
-        # Setup Thread Receiver
-        self.mainThreadSig.connect(self.threadReciver)
-
+        
         # Start Threads
         self.trayIconFoo.start()
-        self.watchlistFoo.start()
         self.priorityWatchlistFoo.start()
+        self.watchlistFoo.start()
 
-        loadingScreen(ui=self, first=True)
-    
-    @pyqtSlot(str)
-    def threadReciver(self, sent):
-        match sent:
-            case 'ProcessManager':
-                if (vars.stopLoadingScreen):
-                    self.refreshProcessManager(varibles=True)
-                    self.show()
-                    self.activateWindow()
-                    CenterWindow(self, app)
-            case 'SettingsMenu':
-                if (vars.stopLoadingScreen):
-                    self.refreshSettingsMenu(menu='base')
-                    self.show()
-                    self.activateWindow()
-                    CenterWindow(self, app)
-            case 'centerWindow':
-                CenterWindow(self, app)
-            case 'stopLoadingScreen':
-                vars.stopLoadingScreen=True
-                loadingScreen(ui=self, loadingScreenStop=True)
-            case 'ResFix':
-                vars.windowVis=self.isVisible()
-                self.show()
-                CenterWindow(self, app)
-            case 'ResFix2':
-                CenterWindow(self, app)
-                if (not vars.windowVis):
-                    vars.windowVis=None
-                    self.hide()
-            case 'quit':
-                loadingScreen(ui=self, loadingScreenStop=True)
-                vars.running=False
-                changeResolution(width=vars.defaultWidth, height=vars.defaultHeight)
-                changePowerPlan(plan='Default', id=vars.defaultPowerPlan)
-                self.shutdown()
+    @pyqtSlot()
+    def shutdown(self):
+        vars.runningThreads=False
+        loadingScreen(ui=self, loadingScreenStop=True)
+        self.watchlistThread.default(quit=True)
+        # Stop Threads
+        self.trayIconFoo.terminate()
+        self.priorityWatchlistFoo.terminate()
+        self.watchlistFoo.terminate()
+        app.quit()
+        
+    @pyqtSlot()
+    def stopLoadingScreen(self):
+        vars.stopLoadingScreen=True
+        loadingScreen(ui=self, loadingScreenStop=True)
+
+    @pyqtSlot()
+    def openProcessManager(self):
+        if (vars.stopLoadingScreen):
+            self.refreshProcessManager()
+            self.show()
+            self.activateWindow()
+            CenterWindow(self, app)
+            
+    @pyqtSlot()
+    def openSettingsMenu(self):
+        if (vars.stopLoadingScreen):
+            self.refreshSettingsMenu(menu='base')
+            self.show()
+            self.activateWindow()
+            CenterWindow(self, app)
+
+    @pyqtSlot()
+    def ResFixPhase1(self):
+        self.windowVis=self.isVisible()
+        self.show()
+        QtTest.QTest.qWait(1000)
+        CenterWindow(self, app)
+
+    @pyqtSlot()
+    def ResFixPhase2(self):
+        CenterWindow(self, app)
+        if (not self.windowVis):
+            self.windowVis=None
+            self.hide()
+        QtTest.QTest.qWait(1000)
+        CenterWindow(self, app)
 
     def toggledBtn(self, button, request):
         match request:
@@ -130,143 +138,72 @@ class Ui(QMainWindow):
                 else:
                     self.programsToRemove.remove(button.text())
 
-    def refreshBtnClick(self):
-        vars.overide = True
-        self.refreshProcessManager(varibles=True)
+    def createProcessButtons(self):
+        runningList=[i[0] for i in getRunningProcesses()]
+        createScrollArea(frame=self.processesFrame, request='button', layout=QGridLayout(), list=runningList, width=self.processesFrame.width(), height=self.processesFrame.height(), verticalScrollBarPolicy=Qt.ScrollBarPolicy.ScrollBarAsNeeded, horizontalScrollBarPolicy=Qt.ScrollBarPolicy.ScrollBarAlwaysOff, function=self.toggledBtn, functionArgs='add', buttonWidth=150, buttonHeight=35, css='background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: left;')
 
-    def addToWatchlist(self):
-        try:
-            if (self.programsToAdd):
-                with open(dir_path+'/files/watchlist.txt', 'a') as f:
+    def createWatchlistButtons(self):
+        createScrollArea(frame=self.watchlistFrame, request='button', layout=QVBoxLayout(), list=vars.programWatchlist, width=150, height=340, verticalScrollBarPolicy=Qt.ScrollBarPolicy.ScrollBarAsNeeded, horizontalScrollBarPolicy=Qt.ScrollBarPolicy.ScrollBarAlwaysOff, function=self.toggledBtn, functionArgs='remove', buttonWidth=110, buttonHeight=25, css='background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: left;')
+
+    def refreshProcessManager(self):
+        uic.loadUi(dir_path+'/ui/runningProcesses.ui', self)
+
+        # Button Functions
+        def addToWatchlist():
+            try:
+                if (self.programsToAdd):
                     for x in self.programsToAdd:
                         programName=x[0]
-                        f.write('\n'+str(programName))
-                self.programsToAdd=[]
-                f.close()
-                self.addBtn.setText('DONE!')
-                self.addBtn.setStyleSheet("background:green")
-                setupWatchList()
-                QtTest.QTest.qWait(2500)
-                self.refreshProcessManager(varibles=True)
-        except Exception as e:
-            self.addBtn.setText('ERROR!')
-            self.addBtn.setStyleSheet("background:red")
-
-    def removeFromWatchlist(self):
-        try:
-            if (self.programsToRemove):
-                newWatchlist=[]
-                with open(dir_path+'/files/watchlist.txt', 'r') as f:
-                    watchlist=f.read()
-                    for x in str(watchlist).split('\n'):
-                        if (x!=''):
-                            if (x not in self.programsToRemove):
-                                newWatchlist.append(x)
-                            else:
-                                try:
-                                    vars.programWatchlist.remove(x)
-                                except Exception as e:
-                                    continue
-
-                    self.programsToRemove=[]
-                f.close()
-
-                with open(dir_path+'/files/watchlist.txt', 'w') as f:
-                    f.write("\n".join(newWatchlist))
-
-                f.close()
-
-                # If Watchlist has one left then change resolution and stuff
-                if (len(vars.programWatchlist)==0):
-                    vars.overide=True
-                setupWatchList()
-
-                self.refreshProcessManager(varibles=True)
-        except Exception as e:
-            self.removeBtn.setText('ERROR!')
-            self.removeBtn.setStyleSheet("background:red")
-
-    def createProcessButtons(self):
-        buttonWidth=173
-        buttonHeight=35
-        maxBtnRow=int((self.processesScrollArea.width())/buttonWidth)
-        amtBtn = 0
-        gridPosX = 0
-        gridPosY = 0
-        
-        for x in getRunningProcesses():
-            path=x[2]
-            name=x[0]
-            if (amtBtn >= maxBtnRow):
-                amtBtn=0
-                gridPosX=0
-                gridPosY+=50
-            amtBtn+=1
-            self.b1 = QPushButton(name, self.processesScrollArea)
-            self.b1.setObjectName(path)
-            self.b1.setFixedHeight(buttonHeight)
-            self.b1.setFixedWidth(buttonWidth)
-            self.b1.setCursor(Qt.CursorShape.CrossCursor)
-            self.b1.setStyleSheet('background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: left; margin-right:20px')
-            self.b1.setCheckable(True)
-            self.b1.clicked.connect(partial(self.toggledBtn, self.b1, 'add'))
-            self.b1.move(gridPosX,gridPosY)
-            gridPosX+=int(self.b1.width())
-
-    def createWatchlistButtons(self, overide=None):
-        buttonSpacer=35
-        maxButtonWidth=160
-        buttonHeight=25
-        gridPosX = 0
-        gridPosY = 0
-        maxBtnRow=int((self.listWidget.width())/maxButtonWidth)
-        maxColumBtn = int((self.listWidget.height())/(buttonSpacer))
-
-        match overide:
-            case 'next':
-                if (vars.buttonMem < len(vars.programWatchlist)):
-                    vars.watchlistBtnAmt=0
+                        writeTxtConfig(file='/files/watchlist.txt', value=str(programName))
+                    self.programsToAdd=[]
+                    self.addBtn.setText('DONE!')
+                    self.addBtn.setStyleSheet("background:green")
+                    setupWatchList()
+                    QtTest.QTest.qWait(2500)
                     self.refreshProcessManager()
-            case 'back':
-                if (vars.buttonMem!=maxColumBtn and vars.buttonMem >= maxColumBtn):
-                    vars.buttonMem=(vars.buttonMem-maxColumBtn)-maxColumBtn
-                    if (vars.buttonMem<0):
-                        vars.buttonMem=0
-                    vars.watchlistBtnAmt=0
-                    self.refreshProcessManager()
-        
-        for x in vars.programWatchlist[vars.buttonMem:]:
-            if (x != ''):
-                if (vars.watchlistBtnAmt >= maxColumBtn):
-                    pass
-                else:
-                    self.b1 = QPushButton(x, self.listWidget)
-                    self.b1.setCheckable(True)
-                    self.b1.setFixedHeight(buttonHeight)
-                    self.b1.setMaximumWidth(maxButtonWidth)
-                    self.b1.setCursor(Qt.CursorShape.PointingHandCursor)
-                    self.b1.setStyleSheet('background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: left;')
-                    self.b1.clicked.connect(partial(self.toggledBtn, self.b1, 'remove'))
-                    self.b1.move(gridPosX,gridPosY)
-                    gridPosY+=buttonSpacer
-                    vars.watchlistBtnAmt+=1
-                    vars.buttonMem+=1
+            except Exception as e:
+                self.addBtn.setText('ERROR!')
+                self.addBtn.setStyleSheet("background:red")
 
-    def refreshProcessManager(self, varibles=None, other=None):
-        uic.loadUi(dir_path+'/ui/runningProcesses.ui', self)
-        if (varibles):
-            vars.watchlistBtnAmt=0
-            vars.buttonMem=0
+        def removeFromWatchlist():
+            try:
+                if (self.programsToRemove):
+                    newWatchlist=[]
+                    default=False
+                    with open(dir_path+'/files/watchlist.txt', 'r') as f:
+                        watchlist=f.read()
+                        for x in str(watchlist).split('\n'):
+                            if (x!=''):
+                                if (x not in self.programsToRemove):
+                                    newWatchlist.append(x)
+                                else:
+                                    try:
+                                        vars.programWatchlist.remove(x)
+                                        if (x == vars.currentTrackedProgram):
+                                            default=True
+                                    except Exception as e:
+                                        continue
+
+                        self.programsToRemove=[]
+                    f.close()
+
+                    writeTxtConfig(file='/files/watchlist.txt', value=("\n".join(newWatchlist)), mode='w')
+                    setupWatchList()
+                    self.refreshProcessManager()
+                    if (default):
+                        self.watchlistThread.default()
+            except Exception as e:
+                self.removeBtn.setText('ERROR!')
+                self.removeBtn.setStyleSheet("background:red")
+
         self.programsToAdd=[]
         self.programsToRemove=[]
         setupWatchList()
         self.createProcessButtons()
         self.createWatchlistButtons()
-        self.addBtn.clicked.connect(self.addToWatchlist)
-        self.removeBtn.clicked.connect(self.removeFromWatchlist)
-        self.refreshBtn.clicked.connect(self.refreshBtnClick)
-        self.nextBtn.clicked.connect(lambda: self.createWatchlistButtons(overide='next'))
-        self.backBtn.clicked.connect(lambda: self.createWatchlistButtons(overide='back'))
+        self.addBtn.clicked.connect(addToWatchlist)
+        self.removeBtn.clicked.connect(removeFromWatchlist)
+        self.refreshBtn.clicked.connect(self.refreshProcessManager)
 
     # Settings Menu
 
@@ -274,17 +211,12 @@ class Ui(QMainWindow):
         match menu:
             case 'base':
                 writeConfig(file='/files/config.json', key='cortexPath', value=self.cortexPathLabel.text())
-                configMem(request='cortexPath')
             case 'display':
                 writeConfig(file='/files/config.json', key='optimizedWidth', value=self.optimizedWidthTxtBox.text())
                 writeConfig(file='/files/config.json', key='optimizedHeight', value=self.optimizedHeightTxtBox.text())
-                configMem(request='optimized')
-                vars.exeRunning = False
             case 'oculus':
-                if (not self.oculusPriorityCheckbox.isChecked()):
-                    loopThroughChangePriority(list=vars.priortyWatchList, priority='normal')
                 writeConfig(file='/files/config.json', key='oculusBoost', value=self.oculusPriorityCheckbox.isChecked())
-                configMem(request='oculusBoost')
+                self.priorityWatchlistThread.check()
         checkmarkIcon(ui=self)
 
     def refreshSettingsMenu(self, menu):
@@ -294,15 +226,16 @@ class Ui(QMainWindow):
                 self.programsToAdd=[]
                 self.programsToRemove=[]
                 uic.loadUi(dir_path+'/ui/settingsMenu.ui', self)
+                configData=getConfig(file='/files/config.json')
                 # Create and Load UI elements
-                createScrollArea(request='button', frame=self.fsrFrame, width=505, height=130, list=getTxtConfig(file='/files/OpenVR.txt'), function=self.toggledBtn, functionRequest='remove', buttonWidth=300, buttonHeight=35, css='background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: right; margin-right:20px')
-                self.cortexPathLabel.setText(vars.cortexPath)
+                createScrollArea(request='button', layout=QVBoxLayout(), frame=self.fsrFrame, width=505, height=130, list=getTxtConfig(file='/files/OpenVR.txt'), verticalScrollBarPolicy=Qt.ScrollBarPolicy.ScrollBarAsNeeded, horizontalScrollBarPolicy=Qt.ScrollBarPolicy.ScrollBarAlwaysOff,  function=self.toggledBtn, functionArgs='remove', buttonWidth=300, buttonHeight=35, css='background-color:rgb(159, 189, 237); color:black; font-size:14px; text-align: right; margin-right:20px')
+                self.cortexPathLabel.setText(configData["cortexPath"])
                 # Button Functions
                 def cortexFileDialogBtnClick():
                     try:
                         path=FileDialog(ui=self, request='file', nameFilter="EXE File (*.exe)" ,defaultDir="C:\Program Files (x86)\Razer\Razer Cortex")[0]
                     except Exception:
-                        path=vars.cortexPath
+                        path=configData["cortexPath"]
                         pass
                     self.cortexPathLabel.setText(path)
                 def injectFsrBtnClick():
@@ -314,6 +247,7 @@ class Ui(QMainWindow):
                             writeTxtConfig(file='/files/OpenVR.txt', value=path)
                             consoleMsg=consoleMsg+'\n FSR Installed: ' + str(path)
                             self.refreshSettingsMenu(menu='base')
+                            checkmarkIcon(ui=self)
                         else:
                             consoleMsg=consoleMsg+'\n FSR ERROR: ' + str(path)
                     except Exception as e:
@@ -349,6 +283,7 @@ class Ui(QMainWindow):
                                     consoleMsg=consoleMsg+"\n Config ERROR: "+str(x)
                             # Show whats going on in console
                             console(self.consoleFrame, self.consoleLabel, consoleMsg)
+                            checkmarkIcon(ui=self)
                     except Exception as e:
                         consoleMsg=consoleMsg+"\n "+str(e)
                         # Show whats going on in console
@@ -359,37 +294,38 @@ class Ui(QMainWindow):
                 self.removeFsrBtn.clicked.connect(removeFsrBtnClick)
                 self.applyBtn.clicked.connect(lambda: self.applySettings(menu='base'))
                 self.cortexFileDialogBtn.clicked.connect(cortexFileDialogBtnClick)
+                self.cortexClearBtn.clicked.connect(lambda: self.cortexPathLabel.setText(''))
             case 'display':
-                configMem(request='optimized')
+                configData=getConfig(file='/files/config.json')
+                defaultResolutionData=getCurrentResolution()
 
                 def resetBtnClicked():
-                    configMem(request='defaultResoultion')
-                    vars.overide=True
+                    defaultResolutionData=getCurrentResolution()
                     setupWatchList()
-                    self.defaultWidthTxtBox.setText(str(vars.defaultWidth))
-                    self.defaultHeightTxtBox.setText(str(vars.defaultHeight))
+                    self.defaultWidthTxtBox.setText(str(defaultResolutionData[0]))
+                    self.defaultHeightTxtBox.setText(str(defaultResolutionData[1]))
                     checkmarkIcon(ui=self)
 
                 uic.loadUi(dir_path+'/ui/settings/displaySettings.ui', self)
-                self.defaultWidthTxtBox.setText(str(vars.defaultWidth))
-                self.defaultHeightTxtBox.setText(str(vars.defaultHeight))
-                self.optimizedWidthTxtBox.setValue(vars.optimizedWidth)
-                self.optimizedHeightTxtBox.setValue(vars.optimizedHeight)
+                self.defaultWidthTxtBox.setText(str(defaultResolutionData[0]))
+                self.defaultHeightTxtBox.setText(str(defaultResolutionData[1]))
+                self.optimizedWidthTxtBox.setValue(int(configData['optimizedWidth']))
+                self.optimizedHeightTxtBox.setValue(int(configData['optimizedHeight']))
 
                 self.resetBtn.clicked.connect(resetBtnClicked)
                 self.applyBtn.clicked.connect(lambda: self.applySettings(menu='display'))
                 self.cancelBtn.clicked.connect(lambda: self.refreshSettingsMenu(menu='display'))
             case 'powerPlan':
                 uic.loadUi(dir_path+'/ui/settings/powerPlanSettings.ui', self)
-
-                self.resetBtn.clicked.connect(lambda: (configMem(request='defaultPowerPlan', overide=True),self.defaultPowerPlanTxtBox.setText(vars.defaultPowerPlan), checkmarkIcon(ui=self)))
+                configData=getConfig(file='/files/config.json')
+                self.resetBtn.clicked.connect(lambda: (writeConfig(file='/files/config.json', key='defaultPowerPlan', value=getCurrentPowerPlan()),self.defaultPowerPlanTxtBox.setText(getConfig(file='/files/config.json')["defaultPowerPlan"]), checkmarkIcon(ui=self)))
                 self.plansBtn.clicked.connect(openPowerPlans)
-                self.defaultPowerPlanTxtBox.setText(vars.defaultPowerPlan)
+                self.defaultPowerPlanTxtBox.setText(configData["defaultPowerPlan"])
                 self.defaultPowerPlanTxtBox.setStyleSheet('background-color: rgb(86, 86, 86);\ncolor: rgb(255, 255, 255);')
             case 'oculus':
-                configMem(request='oculusBoost')
+                configData=getConfig(file='/files/config.json')
                 uic.loadUi(dir_path+'/ui/settings/oculusSettings.ui', self)
-                self.oculusPriorityCheckbox.setChecked(vars.oculusBoost)
+                self.oculusPriorityCheckbox.setChecked(bool(configData["oculusBoost"]))
                 self.applyBtn.clicked.connect(lambda: self.applySettings(menu='oculus'))
                 self.cancelBtn.clicked.connect(lambda: self.refreshSettingsMenu(menu='oculus'))
 
@@ -411,46 +347,40 @@ def setupWatchList():
     print('Watchlist Checked')
 
 def configMem(request=None, all=None, overide=None):
-    print('Loading Memory...')
+    configData=getConfig(file='/files/config.json')
+    if (all):
+        if (not configData["defaultPowerPlan"]):
+            writeConfig(file='/files/config.json', key='defaultPowerPlan', value=getCurrentPowerPlan())
     if(request=='defaultResoultion' or all):
         defaultResolutionData=getCurrentResolution()
         vars.defaultWidth = int(defaultResolutionData[0])
         vars.defaultHeight = int(defaultResolutionData[1])
-    if (request=='optimized'or all):
-        configData=getConfig(file='/files/config.json')
-        vars.optimizedWidth = int(configData['optimizedWidth'])
-        vars.optimizedHeight = int(configData['optimizedHeight'])
-    if (request=='oculusBoost'or all):
-        vars.oculusBoost = bool(getConfig(file='/files/config.json')['oculusBoost'])
-    if (request=='defaultPowerPlan' or all):
-        configData = getConfig(file='/files/config.json')['defaultPowerPlan']
-        if (not configData or overide):
-            writeConfig(file='/files/config.json', key='defaultPowerPlan', value=getCurrentPowerPlan())
-            #Refrsh Config Data
-            configData = getConfig(file='/files/config.json')['defaultPowerPlan']
-        vars.defaultPowerPlan=configData
-    if (request=='cortexPath' or all):
-        configData=getConfig(file='/files/config.json')["cortexPath"]
-        vars.cortexPath=configData
-    print('Memory Loaded!')
 
 class PriortyChanger(QObject):
-    def __init__(self, signal_to_emit):
+    priortyWatchList=['OVRServer_x64.exe']
+    def __init__(self):
         super().__init__()
-        self.signal_to_emit = signal_to_emit
+
+    def check(self):
+        oculusBoost=bool(getConfig(file='/files/config.json')["oculusBoost"])
+        if (oculusBoost):
+            loopThroughChangePriority(list=self.priortyWatchList, priority='high')
+        else:
+            loopThroughChangePriority(list=self.priortyWatchList, priority='normal')
 
     @pyqtSlot()
     def executeThread(self):
-        while vars.running:
-            if (vars.oculusBoost):
-                loopThroughChangePriority(list=vars.priortyWatchList, priority='high')
-
+        while vars.runningThreads:
+            self.check()
             QtTest.QTest.qWait(10000)
 
 class TrayIcon(QObject):
-    def __init__(self, signal_to_emit):
+    processManagerSig = pyqtSignal()
+    settingsMenuSig = pyqtSignal()
+    quitSig=pyqtSignal()
+
+    def __init__(self):
         super().__init__()
-        self.signal_to_emit = signal_to_emit
 
     def create_image(self):
         # Generate an image and draw a pattern
@@ -464,8 +394,8 @@ class TrayIcon(QObject):
             name='WADDLE',
             icon=self.create_image(),title='WADDLE')
         self.icon.menu=pystray.Menu(
-            pystray.MenuItem("Process Manager", lambda: self.signal_to_emit.emit('ProcessManager')),
-            pystray.MenuItem("Settings", lambda: self.signal_to_emit.emit('SettingsMenu')),
+            pystray.MenuItem("Process Manager", lambda: self.processManagerSig.emit()),
+            pystray.MenuItem("Settings", lambda: self.settingsMenuSig.emit()),
             pystray.MenuItem("Quit", self.quitProgram)
         )
 
@@ -475,10 +405,6 @@ class TrayIcon(QObject):
         except Exception as e:
             self.icon.stop()
 
-    def checkWatchlist(self):
-        vars.overide=True
-        setupWatchList()
-
     def stopTray(self):
         self.icon.icon=''
         self.icon.stop()
@@ -486,69 +412,74 @@ class TrayIcon(QObject):
     def quitProgram(self):
         self.stopTray()
         QtTest.QTest.qWait(700)
-        self.signal_to_emit.emit('quit')
+        self.quitSig.emit()
 
 class AutoVR(QObject):
-    def __init__(self, signal_to_emit):
-        super().__init__()
-        self.signal_to_emit = signal_to_emit
+    resFixPhase1Sig=pyqtSignal()
+    resFixPhase2Sig=pyqtSignal()
+    stopLoadingScreenSig=pyqtSignal()
+    exeRunning=False
 
-    def checkForRunningProgram(self, program_name):
+    def __init__(self):
+        super().__init__()
+
+    def getRunningProcessNames(self):
         # Check if the program is running
         try:
             runningProcesses=[]
-            if (program_name != '' or vars.overide):
-                for p in psutil.process_iter():
-                    runningProcesses.append(p.name())
-                if (program_name in runningProcesses and not vars.exeRunning):
-                    vars.currentTrackedProgram = program_name
-                    vars.exeRunning = True
-                    self.signal_to_emit.emit('ResFix')
-                    QtTest.QTest.qWait(1000)
-                    changeResolution(vars.optimizedWidth,vars.optimizedHeight)
-                    self.signal_to_emit.emit('ResFix2')
-                    self.signal_to_emit.emit('centerWindow')
-                    # Wait for Cortex BS if using cortex
-                    if (CortexBoost(cortexExePath=vars.cortexPath)):
-                        QtTest.QTest.qWait(20000)
-                    changePowerPlan('High')
-                elif (program_name not in runningProcesses and vars.currentTrackedProgram == program_name or vars.overide):
-                    self.signal_to_emit.emit('ResFix')
-                    QtTest.QTest.qWait(1000)
-                    changeResolution(vars.defaultWidth,vars.defaultHeight)
-                    self.signal_to_emit.emit('ResFix2')
-                    self.signal_to_emit.emit('centerWindow')
-                    vars.currentTrackedProgram = ''
-                    vars.exeRunning = False
-                    vars.overide=False
-                    # Wait for Cortex BS if using cortex
-                    if (CortexRestore(cortexExePath=vars.cortexPath)):
-                        QtTest.QTest.qWait(20000)
-                    changePowerPlan('Default', id=vars.defaultPowerPlan)
+            for p in psutil.process_iter():
+                runningProcesses.append(p.name())
+            return runningProcesses
         except Exception as e:
             print(e)
+            pass
+
+    @pyqtSlot()
+    def optimize(self, programName):
+        configData=getConfig(file='/files/config.json')
+        vars.currentTrackedProgram = programName
+        self.exeRunning = True
+        self.resFixPhase1Sig.emit()
+        QtTest.QTest.qWait(1000)
+        changeResolution(int(configData["optimizedWidth"]),int(configData["optimizedHeight"]))
+        self.resFixPhase2Sig.emit()
+        # Wait for Cortex BS if using cortex
+        if (CortexBoost(cortexExePath=configData["cortexPath"])):
+            QtTest.QTest.qWait(20000)
+        changePowerPlan('High')
     
-    def finishCheck(self):
-        if (len(vars.programWatchlist)==0):
-            self.checkForRunningProgram(program_name='')
-        for x in vars.programWatchlist:
-            self.checkForRunningProgram(program_name=x)
+    @pyqtSlot()
+    def default(self, quit=None):
+        configData=getConfig(file='/files/config.json')
+        if (not quit):
+            self.resFixPhase1Sig.emit()
+            QtTest.QTest.qWait(1000)
+            changeResolution(vars.defaultWidth,vars.defaultHeight)
+            self.resFixPhase2Sig.emit()
+        vars.currentTrackedProgram = ''
+        self.exeRunning = False
+        # Wait for Cortex BS if using cortex
+        if (CortexRestore(cortexExePath=configData["cortexPath"])):
+            QtTest.QTest.qWait(20000)
+        changePowerPlan('Default', id=configData["defaultPowerPlan"])
+
+    def checkForRunningProgram(self, programWatchList):
+        running=self.getRunningProcessNames()
+        for x in programWatchList:
+            if (x in running and not self.exeRunning):
+                self.optimize(programName=x)
+            elif (x not in running and vars.currentTrackedProgram == x):
+                self.default()
 
     @pyqtSlot()
     def executeThread(self):
-        # Setup Config Files
-        setupConfigFiles(path='/files/')
-        # Load Everything First
-        setupWatchList()
-        configMem(all=True)
-        self.finishCheck()
-        # Stop Loading Screen
-        self.signal_to_emit.emit('stopLoadingScreen')
-        while vars.running:
+        while vars.runningThreads:
             print('RUNNING...')
             # Keep this function runnin
-            self.finishCheck()
-
+            self.checkForRunningProgram(programWatchList=vars.programWatchlist)
+            if (not vars.stopLoadingScreen):
+                self.stopLoadingScreenSig.emit()
+                print('Done Loading')
             QtTest.QTest.qWait(5000)
 
 app = QApplication(sys.argv)

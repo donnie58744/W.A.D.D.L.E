@@ -402,14 +402,14 @@ font-weight:600</string>
                      </property>
                      <property name="minimumSize">
                       <size>
-                       <width>200</width>
+                       <width>255</width>
                        <height>30</height>
                       </size>
                      </property>
                      <property name="maximumSize">
                       <size>
-                       <width>270</width>
-                       <height>25</height>
+                       <width>255</width>
+                       <height>30</height>
                       </size>
                      </property>
                      <property name="font">
@@ -425,7 +425,7 @@ font-weight:600</string>
 color: rgb(255, 255, 255);</string>
                      </property>
                      <property name="text">
-                      <string>TEST</string>
+                      <string/>
                      </property>
                     </widget>
                    </item>
@@ -456,6 +456,53 @@ color: rgb(255, 255, 255);</string>
                       <string>...</string>
                      </property>
                     </widget>
+                   </item>
+                   <item>
+                    <widget class="QPushButton" name="cortexClearBtn">
+                     <property name="sizePolicy">
+                      <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+                       <horstretch>0</horstretch>
+                       <verstretch>0</verstretch>
+                      </sizepolicy>
+                     </property>
+                     <property name="minimumSize">
+                      <size>
+                       <width>35</width>
+                       <height>30</height>
+                      </size>
+                     </property>
+                     <property name="maximumSize">
+                      <size>
+                       <width>32</width>
+                       <height>16777215</height>
+                      </size>
+                     </property>
+                     <property name="font">
+                      <font>
+                       <pointsize>13</pointsize>
+                      </font>
+                     </property>
+                     <property name="styleSheet">
+                      <string notr="true">background-color: rgb(86, 86, 86);
+color: rgb(255, 255, 255);</string>
+                     </property>
+                     <property name="text">
+                      <string>X</string>
+                     </property>
+                    </widget>
+                   </item>
+                   <item>
+                    <spacer name="horizontalSpacer">
+                     <property name="orientation">
+                      <enum>Qt::Horizontal</enum>
+                     </property>
+                     <property name="sizeHint" stdset="0">
+                      <size>
+                       <width>40</width>
+                       <height>20</height>
+                      </size>
+                     </property>
+                    </spacer>
                    </item>
                   </layout>
                  </item>

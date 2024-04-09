@@ -38,50 +38,26 @@
    <layout class="QGridLayout" name="gridLayout">
     <item row="1" column="2">
      <layout class="QGridLayout" name="gridLayout_2">
-      <item row="2" column="0">
-       <spacer name="verticalSpacer_5">
-        <property name="orientation">
-         <enum>Qt::Vertical</enum>
-        </property>
-        <property name="sizeType">
-         <enum>QSizePolicy::Fixed</enum>
-        </property>
-        <property name="sizeHint" stdset="0">
-         <size>
-          <width>20</width>
-          <height>30</height>
-         </size>
-        </property>
-       </spacer>
-      </item>
-      <item row="1" column="0" alignment="Qt::AlignHCenter">
-       <widget class="QScrollArea" name="processesScrollArea">
+      <item row="1" column="0">
+       <widget class="QFrame" name="processesFrame">
         <property name="sizePolicy">
-         <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+         <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
           <horstretch>0</horstretch>
           <verstretch>0</verstretch>
          </sizepolicy>
         </property>
         <property name="minimumSize">
          <size>
-          <width>520</width>
-          <height>0</height>
+          <width>525</width>
+          <height>494</height>
          </size>
         </property>
-        <property name="widgetResizable">
-         <bool>true</bool>
+        <property name="frameShape">
+         <enum>QFrame::StyledPanel</enum>
         </property>
-        <widget class="QWidget" name="scrollAreaWidgetContents_2">
-         <property name="geometry">
-          <rect>
-           <x>0</x>
-           <y>0</y>
-           <width>518</width>
-           <height>456</height>
-          </rect>
-         </property>
-         <layout class="QGridLayout" name="gridLayout_4"/>
-        </widget>
+        <property name="frameShadow">
+         <enum>QFrame::Raised</enum>
+        </property>
        </widget>
       </item>
       <item row="0" column="0">
@@ -109,6 +85,9 @@
           <widget class="QPlainTextEdit" name="consoleLabel">
            <property name="cursor" stdset="0">
             <cursorShape>ForbiddenCursor</cursorShape>
+           </property>
+           <property name="readOnly">
+            <bool>true</bool>
            </property>
           </widget>
          </item>
@@ -151,7 +130,7 @@
          <widget class="QPushButton" name="addBtn">
           <property name="minimumSize">
            <size>
-            <width>0</width>
+            <width>170</width>
             <height>40</height>
            </size>
           </property>
@@ -214,6 +193,12 @@ border-radius: 5px;</string>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
+          <property name="minimumSize">
+           <size>
+            <width>170</width>
+            <height>0</height>
+           </size>
+          </property>
           <property name="maximumSize">
            <size>
             <width>159</width>
@@ -266,36 +251,24 @@ border-radius: 5px;</string>
               </widget>
              </item>
              <item>
-              <widget class="QListWidget" name="listWidget">
+              <widget class="QFrame" name="watchlistFrame">
                <property name="sizePolicy">
-                <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+                <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                  <horstretch>0</horstretch>
                  <verstretch>0</verstretch>
                 </sizepolicy>
                </property>
                <property name="minimumSize">
                 <size>
-                 <width>130</width>
-                 <height>315</height>
+                 <width>150</width>
+                 <height>340</height>
                 </size>
                </property>
-               <property name="maximumSize">
-                <size>
-                 <width>16777133</width>
-                 <height>16777215</height>
-                </size>
+               <property name="frameShape">
+                <enum>QFrame::StyledPanel</enum>
                </property>
-               <property name="verticalScrollBarPolicy">
-                <enum>Qt::ScrollBarAsNeeded</enum>
-               </property>
-               <property name="horizontalScrollBarPolicy">
-                <enum>Qt::ScrollBarAlwaysOff</enum>
-               </property>
-               <property name="sizeAdjustPolicy">
-                <enum>QAbstractScrollArea::AdjustToContents</enum>
-               </property>
-               <property name="autoScroll">
-                <bool>true</bool>
+               <property name="frameShadow">
+                <enum>QFrame::Raised</enum>
                </property>
               </widget>
              </item>
@@ -309,76 +282,6 @@ border-radius: 5px;</string>
                  <property name="spacing">
                   <number>9</number>
                  </property>
-                 <item row="1" column="1">
-                  <widget class="QPushButton" name="nextBtn">
-                   <property name="sizePolicy">
-                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                     <horstretch>0</horstretch>
-                     <verstretch>0</verstretch>
-                    </sizepolicy>
-                   </property>
-                   <property name="minimumSize">
-                    <size>
-                     <width>60</width>
-                     <height>0</height>
-                    </size>
-                   </property>
-                   <property name="font">
-                    <font>
-                     <weight>99</weight>
-                     <bold>true</bold>
-                    </font>
-                   </property>
-                   <property name="cursor">
-                    <cursorShape>PointingHandCursor</cursorShape>
-                   </property>
-                   <property name="styleSheet">
-                    <string notr="true">background-color: rgb(0, 0, 0);
-color: rgb(255, 255, 255);
-font-weight:800;
-border: 2px solid grey;
-border-radius: 5px;</string>
-                   </property>
-                   <property name="text">
-                    <string>Next</string>
-                   </property>
-                  </widget>
-                 </item>
-                 <item row="1" column="0">
-                  <widget class="QPushButton" name="backBtn">
-                   <property name="sizePolicy">
-                    <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-                     <horstretch>0</horstretch>
-                     <verstretch>0</verstretch>
-                    </sizepolicy>
-                   </property>
-                   <property name="minimumSize">
-                    <size>
-                     <width>60</width>
-                     <height>0</height>
-                    </size>
-                   </property>
-                   <property name="font">
-                    <font>
-                     <weight>99</weight>
-                     <bold>true</bold>
-                    </font>
-                   </property>
-                   <property name="cursor">
-                    <cursorShape>PointingHandCursor</cursorShape>
-                   </property>
-                   <property name="styleSheet">
-                    <string notr="true">background-color: rgb(0, 0, 0);
-color: rgb(255, 255, 255);
-font-weight:800;
-border: 2px solid grey;
-border-radius: 5px;</string>
-                   </property>
-                   <property name="text">
-                    <string>Back</string>
-                   </property>
-                  </widget>
-                 </item>
                  <item row="0" column="0">
                   <widget class="QPushButton" name="removeBtn">
                    <property name="sizePolicy">
@@ -390,11 +293,12 @@ border-radius: 5px;</string>
                    <property name="minimumSize">
                     <size>
                      <width>60</width>
-                     <height>0</height>
+                     <height>30</height>
                     </size>
                    </property>
                    <property name="font">
                     <font>
+                     <pointsize>-1</pointsize>
                      <weight>99</weight>
                      <bold>true</bold>
                     </font>
@@ -405,6 +309,7 @@ border-radius: 5px;</string>
                    <property name="styleSheet">
                     <string notr="true">background-color: rgb(0, 0, 0);
 color: rgb(255, 255, 255);
+font-size: 14px;
 font-weight:800;
 border: 2px solid grey;
 border-radius: 5px;</string>

@@ -1,7 +1,7 @@
 import keyboard, os
 
 def CheckCortex(cortexExePath):
-    if (os.access(cortexExePath, os.X_OK) and 'Razer Cortex' in cortexExePath):
+    if (cortexExePath and os.access(cortexExePath, os.X_OK) and 'Razer Cortex' in cortexExePath):
         return True
     else:
         return False
