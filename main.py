@@ -233,7 +233,7 @@ class Ui(QMainWindow):
                 # Button Functions
                 def cortexFileDialogBtnClick():
                     try:
-                        path=FileDialog(ui=self, request='file', nameFilter="EXE File (*.exe)" ,defaultDir="C:\Program Files (x86)\Razer\Razer Cortex")[0]
+                        path=FileDialog(ui=self, request='file', nameFilter="EXE File (*.exe)" ,defaultDir="C:/Program Files (x86)/Razer/Razer Cortex")[0]
                     except Exception:
                         path=configData["cortexPath"]
                         pass
