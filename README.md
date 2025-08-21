@@ -35,13 +35,13 @@
 
     <img src="README_IMGS/Settings.png" alt="icon" height="400" />
 
-  - #### Process Manager
+- #### Process Manager
 
-    - Shows processes with the highest CPU usage first
+  - Shows processes with the highest CPU usage first
 
-    - Add/Remove an process from the watch list
+  - Add/Remove an process from the watch list
 
-      <img src="README_IMGS/ProcessManager.png" alt="icon" height="400" />
+    <img src="README_IMGS/ProcessManager.png" alt="icon" height="400" />
 
 ### Run
 
